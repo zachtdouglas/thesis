@@ -1,0 +1,57 @@
+def conv_block(input_layer, filters, kernel_size):
+    c = Conv3D(filters, kernel_size = (kernel_size, kernel_size, kernel_size), padding = 'same') (input_layer)
+    c = BatchNormalization() (c)
+    c = Activation('relu') (c)
+    c = Conv3D(filters, kernel_size = (kernel_size, kernel_size, kernel_size), padding = 'same') (c)
+    c = BatchNormalization() (c)
+    c = Activation('relu') (c)
+    c = add([input_layer, c])
+    
+    return c
+
+
+def v_net(input_img, filters = 8, dropout = 0.2):
+    c1 = Conv3D(filters, kernel_size = (5, 5, 5), padding = 'same') (input_img)
+    
+    c2 = Conv3D(filters*2, kernel_size = (2, 2, 2), strides = (2, 2, 2), padding = 'same') (c1)
+    c2 = conv_block(c2, filters*2, 5)
+    
+    c3 = Conv3D(filters*4, kernel_size = (2, 2, 2), strides = (2, 2, 2), padding = 'same') (c2)
+    c3 = Dropout(dropout) (c3)
+    c3 = conv_block(c3, filters*4, 5)
+    
+    c4 = Conv3D(filters*8, kernel_size = (2, 2, 2), strides = (2, 2, 2), padding = 'same') (c3)
+    c4 = Dropout(dropout) (c4)
+    c4 = conv_block(c4, filters*8, 5)
+    
+    c5 = Conv3D(filters*16, kernel_size = (2, 2, 2), strides = (2, 2, 2), padding = 'same') (c4)
+    c5 = Dropout(dropout) (c5)
+    c5 = conv_block(c5, filters*16, 5)
+    
+    u6 = Conv3DTranspose(filters*8, kernel_size = (2, 2, 2), strides = (2, 2, 2), padding = 'same') (c5)
+    u6 = concatenate([u6, c4])
+    u6 = conv_block(u6, filters*16, 5)
+    u6 = Dropout(dropout) (u6)
+    
+    u7 = Conv3DTranspose(filters*4, kernel_size = (2, 2, 2), strides = (2, 2, 2), padding = 'same') (u6)
+    u7 = concatenate([u7, c3])
+    u7 = conv_block(u7, filters*8, 5)
+    u7 = Dropout(dropout) (u7) 
+    
+    u8 = Conv3DTranspose(filters*2, kernel_size = (2, 2, 2), strides = (2, 2, 2), padding = 'same') (u7)
+    u8 = concatenate([u8, c2])
+    u8 = conv_block(u8, filters*4, 5)
+    u8 = Dropout(dropout) (u8) 
+    
+    u9 = Conv3DTranspose(filters, kernel_size = (2, 2, 2), strides = (2, 2, 2), padding = 'same') (u8)
+    u9 = concatenate([u9, c1])
+    
+    c9 = Conv3D(filters*2, kernel_size = (5, 5, 5), padding = 'same') (u9)
+    c9 = Dropout(dropout) (c9)
+    c9 = add([c9, u9])
+    
+    outputs = Conv3D(4, kernel_size = (1, 1, 1), activation = 'softmax') (c9)
+    
+    model = Model(inputs = input_img, outputs = outputs)
+    
+    return model
